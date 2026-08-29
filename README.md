@@ -37,5 +37,6 @@ Add an entry for it to `.claude-plugin/marketplace.json`, then validate and smok
 
 ```
 claude plugin validate ./plugins/<plugin-name> --strict
+# test local (not yet published) version
 claude --plugin-dir ./plugins/<plugin-name>
 ```
