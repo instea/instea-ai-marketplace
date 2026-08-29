@@ -1,0 +1,33 @@
+# Template: <service>/docker/Dockerfile for a Node API / worker / GraphQL server.
+#
+# Adapt before use:
+#   - node version    -> engines.node or .nvmrc, else current LTS
+#   - package manager -> yarn.lock / package-lock.json / pnpm-lock.yaml
+#   - PORT / EXPOSE   -> the port the service actually listens on
+#   - CMD             -> the service's own start script
+#
+# Build context is the service directory, so all paths here are relative to it.
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Dependencies first: this layer is cached until the lockfile changes.
+COPY ./package.json ./yarn.lock ./
+RUN yarn config set network-timeout 180000
+RUN yarn install --frozen-lockfile
+
+COPY . .
+
+# House convention: a failing test fails the image build, so a broken image
+# can never reach the registry. Drop this line if the suite needs a live
+# database or the service has no tests — and say so when you do.
+RUN yarn test
+
+# Shed devDependencies now that tests have run.
+RUN yarn install --production --frozen-lockfile
+
+ENV PORT=4000
+EXPOSE 4000
+
+CMD ["yarn", "start"]

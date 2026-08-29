@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "instea-ai-marketplace",
+  "description": "Instea's collection of Claude Code plugins and skills.",
+  "owner": {
+    "name": "Instea",
+    "url": "https://instea.co"
+  },
+  "plugins": [
+    {
+      "name": "project-setup",
+      "source": "./plugins/project-setup",
+      "description": "Instea house standards for project infrastructure. Skill: docker-release-workflow.",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": ["docker", "release", "ci"]
+    }
+  ]
+}

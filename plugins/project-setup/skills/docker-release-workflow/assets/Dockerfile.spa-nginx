@@ -1,0 +1,36 @@
+# Template: <service>/docker/Dockerfile for a React / Vite SPA served by nginx.
+#
+# Adapt before use:
+#   - node version   -> engines.node or .nvmrc, else current LTS
+#   - build output   -> CRA writes ./build, Vite writes ./dist. Check the build
+#                       script before wiring the COPY --from below; a wrong path
+#                       produces an image that builds fine and serves nothing.
+#   - nginx.conf     -> copy assets/nginx.conf next to this file, under docker/conf/
+#
+# Build context is the service directory, so all paths here are relative to it.
+
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+# Dependencies first: this layer is cached until the lockfile changes.
+COPY ./package.json ./yarn.lock ./
+RUN yarn config set network-timeout 180000
+RUN yarn install --frozen-lockfile
+
+COPY . .
+
+# House convention: a failing test fails the image build, so a broken image
+# can never reach the registry. Drop this line if the service has no tests —
+# and say so when you do.
+RUN yarn test
+
+RUN yarn build
+
+
+FROM nginx:1.27-alpine
+
+COPY --from=build /app/build /usr/share/nginx/html
+COPY ./docker/conf/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

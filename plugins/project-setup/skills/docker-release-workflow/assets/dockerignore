@@ -1,0 +1,23 @@
+# Template: <service>/.dockerignore — copy to the service root, named `.dockerignore`.
+#
+# Keeping these out of the build context matters twice over: the context upload
+# is faster, and a host node_modules built for a different platform can't shadow
+# the one installed inside the image.
+
+node_modules
+npm-debug.log
+yarn-error.log
+
+.git
+.gitignore
+
+build
+dist
+coverage
+reports
+
+.env.local
+.env.*.local
+
+Dockerfile
+.dockerignore
