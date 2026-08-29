@@ -1,0 +1,11 @@
+{
+  "name": "project-setup",
+  "description": "Instea house standards for bootstrapping project infrastructure — CI, Docker, release pipelines.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Instea"
+  },
+  "homepage": "https://github.com/instea/instea-ai-marketplace/tree/main/plugins/project-setup",
+  "license": "MIT",
+  "keywords": ["docker", "github-actions", "release", "ci", "instea"]
+}
