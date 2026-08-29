@@ -1,0 +1,26 @@
+{
+  "skill_name": "devcontainer-claude-sandbox",
+  "evals": [
+    {
+      "id": 0,
+      "name": "greenfield-vite-no-compose",
+      "prompt": "Set up the devcontainer for this repo so I can run claude inside it instead of on my laptop.",
+      "expected_output": "A .devcontainer/ with claude-code + node features, a named volume for ~/.claude, and postCreateCommand.sh with the credsStore/chown/symlink fixes. Should NOT add docker-in-docker (nothing in the repo runs containers). Should notice the Vite dev server binds localhost and needs --host.",
+      "fixture": "vite-spa"
+    },
+    {
+      "id": 1,
+      "name": "existing-devcontainer-patch",
+      "prompt": "We already have a devcontainer here but claude isn't in it. Add it, and use a per-project volume - this is client code and I don't want it sharing credentials with my other repos.",
+      "expected_output": "Patches the existing devcontainer.json rather than overwriting it: adds the claude-code feature, adds the mount with source=${localWorkspaceFolderBasename}-claude-config, creates postCreateCommand.sh. Should catch that the existing top-level \"extensions\" key is the deprecated schema and move it under customizations.vscode. Should preserve the existing java feature and settings.",
+      "fixture": "existing-java"
+    },
+    {
+      "id": 2,
+      "name": "python-compose-nonvscode-user",
+      "prompt": "set this up to run the agent in a container. we need the postgres from compose working inside it too",
+      "expected_output": "Swaps the node feature for python:1, keeps docker-in-docker (compose is present), and mounts the config volume at the correct remote user's home for the chosen base image rather than blindly using /home/vscode. Forwards port 8000 from the uvicorn dev command.",
+      "fixture": "python-fastapi"
+    }
+  ]
+}

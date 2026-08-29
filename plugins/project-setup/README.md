@@ -1,7 +1,8 @@
 # project-setup
 
-Instea house standards for bootstrapping project infrastructure — CI, Docker and release
-pipelines — so every repo ends up with the same shape instead of a hand-rolled variant.
+Instea house standards for bootstrapping project infrastructure — CI, Docker, release pipelines
+and sandboxed dev environments — so every repo ends up with the same shape instead of a
+hand-rolled variant.
 
 ## Install
 
@@ -15,6 +16,7 @@ pipelines — so every repo ends up with the same shape instead of a hand-rolled
 | Skill | Invocation | What it does |
 |---|---|---|
 | `docker-release-workflow` | ⌨️ explicit | GitHub Actions workflow that builds and publishes each service's Docker image and cuts a GitHub release |
+| `devcontainer-claude-sandbox` | ⌨️ explicit | `.devcontainer/` that runs Claude Code sandboxed inside the project's own container, with the agent's config on a named volume instead of the host's `~/.claude` |
 
 - ⌨️ **explicit** — you start it yourself with a slash command; Claude never runs it on its own
   (the skill sets `disable-model-invocation: true`).
@@ -90,6 +92,95 @@ gh secret set DOCKER_REGISTRY_PASSWORD
 `skills/docker-release-workflow/references/troubleshooting.md` lists the symptoms and causes this
 workflow actually produces — auth failures, missing build context, wrong Dockerfile path, releases
 that never appear.
+
+### `devcontainer-claude-sandbox` ⌨️
+
+Scaffolds a `.devcontainer/` so that every development command — the agent, the app, the tests, the
+database — runs inside a container instead of on the developer's machine.
+
+The point is blast radius. An agent running on the host can read `~/.ssh`, `~/.aws`, browser
+profiles and every other repo you have checked out; so can a postinstall script in a freshly added
+dependency, with or without an agent involved. Inside a container it sees the workspace and little
+else, which is what makes running with loosened permissions a defensible choice rather than a gamble.
+
+**Invoke it explicitly:**
+
+```
+/project-setup:devcontainer-claude-sandbox
+```
+
+Anything you type after the command name is treated as a deliberate instruction and overrides the
+defaults — a per-project config volume, a particular base image, "we don't need docker-in-docker".
+
+**What you get**
+
+`.devcontainer/` containing `devcontainer.json`, a thin `Dockerfile`, and `postCreateCommand.sh`
+(plus `postStartCommand.sh` when the project runs services). The `devcontainer.json` pulls in the
+`claude-code` feature, a language feature, and `docker-in-docker` where the project needs it.
+
+The security core is the config volume:
+
+```jsonc
+"mounts": ["source=claude-code-config,target=/home/vscode/.claude,type=volume"]
+```
+
+Mounting the host's `~/.claude` into the container would hand back the credentials you just went to
+the trouble of isolating — and that directory has been a target of real supply-chain attacks. A
+named volume keeps the login across rebuilds without exposing the host. `target` must be the remote
+user's home, which is why the skill establishes that up front. Choose the source deliberately:
+
+- **Shared `claude-code-config`** (default) — one login covers every project on the machine.
+- **Per-project** `source=${localWorkspaceFolderBasename}-claude-config` — a compromised dependency
+  in one repo cannot read another's agent credentials. Prefer it for client work. Costs a login
+  per project.
+
+**What it protects, and what it does not**
+
+Protected: the host home directory and its credentials, other checkouts, host-level packages and
+daemons. *Not* protected: the repo itself (the workspace is bind-mounted, so uncommitted work is
+what's at risk), network egress unless you add the optional firewall, and anything passed through
+`remoteEnv`. The skill states this in its handover on purpose — a sandbox people over-trust is
+worse than none.
+
+**How it runs**
+
+1. *Survey* — detects an existing `.devcontainer/` (patched, never overwritten), the stack and
+   package manager from the lockfile, whether docker-in-docker is needed, the ports, and the base
+   image's remote user; confirms before writing anything.
+2. *Write the files* — from the bundled templates, adapted to what it found.
+3. *Decide how services run* — compose siblings, or docker-in-docker. This is where the skill
+   earns its keep: a rebuild destroys the inner daemon's `/var/lib/docker`, taking the database
+   with it, so it either binds data into the workspace or persists the volume, and says which.
+4. *Make the app reachable* — bind `0.0.0.0` rather than `localhost`, set `forwardPorts`, and flag
+   that the devcontainer CLI ignores `forwardPorts` instead of papering over it.
+5. *Build it* — runs the bundled checker, then an actual `devcontainer build`. A container that has
+   never been built is a guess.
+6. *Hand over* — how to get in and rebuild, the one-time login, ports, what was verified, what the
+   sandbox does not cover, and what a rebuild will cost.
+
+**Bundled files** (`skills/devcontainer-claude-sandbox/`)
+
+| File | Use |
+|---|---|
+| `assets/devcontainer.json` | Features, the config volume, ports, extensions |
+| `assets/Dockerfile` | Only what the features don't cover |
+| `assets/postCreateCommand.sh` | The four fixes that make the container usable |
+| `assets/postStartCommand.sh` | Brings services up on every start (docker-in-docker only) |
+| `assets/notify.sh` | Optional — host notifications for long agent runs, via apprise |
+| `scripts/check-devcontainer.py` | Validates the result in step 5 |
+
+`check-devcontainer.py` catches the failures that are invisible in a diff: a mount target that
+doesn't match `remoteUser`, a config volume declared under a compose-based setup (where it is
+silently ignored), a missing postCreate fix, a deprecated top-level `extensions` key. It exits
+non-zero on real failures and prints `WARN` for judgment calls — read those, don't just check the
+exit code. It keeps `assets/postCreateCommand.sh` honest by grepping for the three fixes that script
+implements, so those two files must be edited together.
+
+**When something doesn't work**
+
+`skills/devcontainer-claude-sandbox/references/troubleshooting.md` covers the failures this setup
+actually produces — credsStore errors, `~/.claude` permission denials, logins that don't persist,
+the app not being reachable from the host, and rebuilds that wipe the database.
 
 ## Adding a skill to this plugin
 

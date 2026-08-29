@@ -1,0 +1,46 @@
+// Instea house standard: Claude Code runs inside this container, never on the host.
+// Replace <project> and check every value marked ADAPT before using.
+{
+  "name": "<project> (sandboxed)",
+
+  // Drop this and use "image" directly if the project needs no extra apt packages.
+  "build": { "dockerfile": "Dockerfile" },
+
+  "features": {
+    // ADAPT: swap for python:1 / go:1 / rust:1 on a non-Node project.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "pnpmVersion": "latest"
+    },
+    // Only needed if the repo runs containers (compose, Testcontainers).
+    // moby:false installs upstream Docker CE — see SKILL.md before changing.
+    "ghcr.io/devcontainers/features/docker-in-docker:3": {
+      "version": "lts",
+      "moby": false
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  // The agent's config lives on a named volume, NOT on the host home directory.
+  // ADAPT: target must be <remote user's home>/.claude — `vscode` for the
+  // devcontainers/base images, `node` for the Node images. Variable substitution
+  // does not work here; mounts are applied before the container env exists.
+  // For stricter isolation use source=${localWorkspaceFolderBasename}-claude-config.
+  "mounts": [
+    "source=claude-code-config,target=/home/vscode/.claude,type=volume"
+  ],
+
+  // ADAPT: read these from the dev script and any compose ports.
+  // Ignored by the devcontainer CLI (devcontainers/cli#186) — IDE users only.
+  "forwardPorts": [3000],
+
+  "customizations": {
+    "vscode": {
+      // NOT a top-level "extensions" key — that schema is deprecated and
+      // silently ignored outside VS Code.
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/postCreateCommand.sh"
+}
