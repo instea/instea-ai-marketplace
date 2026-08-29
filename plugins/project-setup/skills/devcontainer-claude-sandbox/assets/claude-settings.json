@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "instea-ai-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "instea/instea-ai-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "project-setup@instea-ai-marketplace": true
+  }
+}

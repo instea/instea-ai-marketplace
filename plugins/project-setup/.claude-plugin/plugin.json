@@ -1,7 +1,7 @@
 {
   "name": "project-setup",
   "description": "Instea house standards for bootstrapping project infrastructure — CI, Docker, release pipelines and sandboxed dev environments.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Instea"
   },

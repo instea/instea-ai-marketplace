@@ -4,8 +4,9 @@
 Usage:  python3 scripts/check-devcontainer.py [path-to-repo]
 
 Checks the things that fail silently — a config that parses but leaves the agent
-unsandboxed, or a mount target the agent will never read. Exit code 1 on any
-FAIL. WARNs are judgment calls that may be correct for the project.
+unsandboxed, a mount target the agent will never read, or a repo that never tells
+the container where the house skills come from. Exit code 1 on any FAIL. WARNs are
+judgment calls that may be correct for the project.
 
 devcontainer.json is JSONC: it allows // and /* */ comments and trailing commas.
 Stripping those with a naive regex corrupts any "https://..." string value, so
@@ -13,8 +14,12 @@ this walks the text tracking string state instead.
 """
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+
+MARKETPLACE = "instea-ai-marketplace"
+PLUGIN = f"project-setup@{MARKETPLACE}"
 
 
 def strip_jsonc(s: str) -> str:
@@ -140,6 +145,49 @@ def main() -> int:
                 f"move to customizations.vscode.{key} — it is ignored outside VS Code",
             )
 
+    # --- the house plugins: the container's ~/.claude starts empty ---
+    settings = root / ".claude" / "settings.json"
+    if not settings.exists():
+        warn(
+            "no .claude/settings.json declaring the house plugins",
+            "the container's fresh ~/.claude volume gets no house skills — see 'Step 2' in SKILL.md",
+        )
+    else:
+        try:
+            st = json.loads(strip_jsonc(settings.read_text()))
+        except json.JSONDecodeError as e:
+            st = None
+            bad(".claude/settings.json does not parse", str(e)[:120])
+        if st is not None:
+            known = (st.get("extraKnownMarketplaces") or {}).get(MARKETPLACE)
+            enabled = (st.get("enabledPlugins") or {}).get(PLUGIN)
+            missing = [
+                label
+                for label, present in (
+                    (f"extraKnownMarketplaces['{MARKETPLACE}']", known),
+                    (f"enabledPlugins['{PLUGIN}']", enabled),
+                )
+                if not present
+            ]
+            if missing:
+                warn(
+                    "house plugins not fully declared in .claude/settings.json",
+                    f"missing {', '.join(missing)} — an enable without the marketplace is skipped silently",
+                )
+            else:
+                ok("house plugins declared in .claude/settings.json", PLUGIN)
+        r = subprocess.run(
+            ["git", "check-ignore", "-q", str(settings)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode == 0:
+            warn(
+                ".claude/settings.json is git-ignored",
+                "it reaches nobody else — ignore .claude/* (not .claude/) and negate !.claude/settings.json",
+            )
+
     # --- services / persistence ---
     if has("docker-in-docker"):
         dind_persisted = "/var/lib/docker" in json.dumps(dc.get("mounts") or [])
@@ -161,8 +209,6 @@ def main() -> int:
         )
 
     # --- shell syntax ---
-    import subprocess
-
     for sh in sorted(dc_dir.glob("*.sh")):
         r = subprocess.run(["bash", "-n", str(sh)], capture_output=True, text=True)
         (ok if r.returncode == 0 else bad)(f"{sh.name} shell syntax", r.stderr.strip()[:120])

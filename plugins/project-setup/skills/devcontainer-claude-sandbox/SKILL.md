@@ -85,7 +85,7 @@ produces a container that looks fine and quietly loses state, so it is worth the
 
 ## Step 2 — Write the devcontainer files
 
-Copy all three from `assets/`, then adapt:
+Copy what applies from `assets/`, then adapt:
 
 | File | Purpose |
 |---|---|
@@ -93,6 +93,7 @@ Copy all three from `assets/`, then adapt:
 | `assets/Dockerfile` | Only what the features don't cover |
 | `assets/postCreateCommand.sh` | The four fixes that make the container usable |
 | `assets/postStartCommand.sh` | Bringing services up on every start (step 3, option B only) |
+| `assets/claude-settings.json` | The repo's `.claude/settings.json` — the house plugins |
 | `scripts/check-devcontainer.py` | Validates the result in step 5 |
 
 ### The config volume
@@ -147,6 +148,62 @@ pre-`customizations` schema; it is deprecated, and tooling other than VS Code ig
 outright — the extensions just never install and no error explains why. If you are patching an
 existing devcontainer and find a top-level `extensions` or `settings` key, move it and mention
 that you did.
+
+### The repo's Claude settings
+
+The container's `~/.claude` is a fresh, empty volume — that is the whole point of it. Nothing the
+developer has installed on their laptop crosses that boundary, so unless the repo says otherwise
+the agent inside the sandbox has none of the house skills. The repo's committed
+`.claude/settings.json` is the only channel that reaches every developer's container, so **always**
+write these two keys into it (`assets/claude-settings.json` is the same file, ready to copy):
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "instea-ai-marketplace": {
+      "source": { "source": "github", "repo": "instea/instea-ai-marketplace" }
+    }
+  },
+  "enabledPlugins": { "project-setup@instea-ai-marketplace": true }
+}
+```
+
+**Both keys, always.** `enabledPlugins` on its own names a marketplace the fresh volume has never
+heard of; Claude Code drops it as an orphaned entry and starts with the plugin absent and no error
+anywhere — the skills are simply not there, and the developer has nothing to search for.
+`extraKnownMarketplaces` is what registers the source so the enable resolves. The two are a pair.
+
+**Merge, never overwrite.** Plenty of repos already keep `permissions` or `hooks` here — the
+notify.sh addition below writes hooks into this very file. Merge into the two objects and preserve
+every existing member, the same way step 1 patches an existing `.devcontainer/` rather than
+replacing it.
+
+It must be `settings.json`, not `settings.local.json`: the local variant is personal and
+git-ignored, so it reaches nobody. Check the file can actually be committed —
+
+```bash
+git check-ignore -v .claude/settings.json
+```
+
+A repo that ignores `.claude/` wholesale turns this step into a silent no-op for everyone but you.
+Un-ignoring it takes two lines, not one:
+
+```gitignore
+.claude/*
+!.claude/settings.json
+```
+
+The obvious fix — keeping `.claude/` and adding the negation — does nothing at all. Git never
+descends into an excluded *directory*, so a negation for a file inside one is never even
+consulted; the pattern has to exclude the contents (`.claude/*`) for the negation to be reachable.
+`git check-ignore -v` names the line that decided, which is the quickest way to see this.
+
+Tell the user to commit the file in the handover.
+
+The equivalent CLI is `claude plugin marketplace add instea/instea-ai-marketplace --scope project`
+followed by `claude plugin install project-setup@instea-ai-marketplace --scope project`. It writes
+the same shape, but it also clones the marketplace into the machine you happen to be running on,
+so prefer editing the JSON.
 
 ## Step 3 — Decide how the project's services run
 
@@ -333,15 +390,18 @@ Close with a short handover covering exactly these points:
 2. **First login** — Claude Code needs an interactive login once; after that the volume keeps
    it across rebuilds. If it ever stops persisting, the symlink in fix 3 of the postCreate
    script is the thing to check.
-3. **Ports** — what is forwarded, and the CLI caveat from step 4.
-4. **What you verified** — the build result, or plainly that you could not build it here.
-5. **What the sandbox does not cover** — the "Not protected" list above, in one line. People
+3. **The house plugins** — `.claude/settings.json` must be committed or nobody else gets them.
+   The first Claude Code start inside the container fetches the marketplace from GitHub and asks
+   once to trust `project-setup`; that first run needs network.
+4. **Ports** — what is forwarded, and the CLI caveat from step 4.
+5. **What you verified** — the build result, or plainly that you could not build it here.
+6. **What the sandbox does not cover** — the "Not protected" list above, in one line. People
    will run the agent with loosened permissions on the strength of this setup; they should know
    the repo is still live and egress is still open.
-6. **What a rebuild will cost** — if the project ended up on docker-in-docker, state plainly
+7. **What a rebuild will cost** — if the project ended up on docker-in-docker, state plainly
    whether a rebuild wipes the database and image cache, and what you did about it. This is the
    single most surprising behaviour in the whole setup, and the developer will hit it.
-7. **Superseded setup** — if the repo has a `Vagrantfile`, an ad-hoc `docker-compose` dev
+8. **Superseded setup** — if the repo has a `Vagrantfile`, an ad-hoc `docker-compose` dev
    service, or a README section telling people to install Node locally, point out the overlap.
    Don't delete it; retiring the old path is the team's call.
 
@@ -381,6 +441,13 @@ generated during `devcontainer up`/`build`, which means you cannot produce one o
 the CLI. That is fine: note in the handover that the first person to bring the container up will
 generate it and should commit it. Don't hand-write one.
 
+**`extraKnownMarketplaces` beside `enabledPlugins`.** It looks redundant — the plugin id already
+contains `@instea-ai-marketplace` — and it is the first thing someone deletes while tidying. It is
+not redundant: the id is a name, and a container whose `~/.claude` is a fresh volume has no record
+of what that name points at. Claude Code skips the enable as an orphaned entry, silently, and the
+house skills never load. Deleting this key produces a repo that works on the machine where it was
+written and nowhere else.
+
 ## Optional additions
 
 Offer these when they fit. Don't add them unasked; the plain setup is what the team reviews at
@@ -392,7 +459,9 @@ exfiltrate whatever it can read. An egress allowlist belongs at the end of
 reinventing:
 [init-firewall.sh](https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh).
 It needs `"runArgs": ["--cap-add=NET_ADMIN"]` in `devcontainer.json`. Warn that it will break
-any tooling reaching a host you forgot to list, which is the usual reason it gets ripped out.
+any tooling reaching a host you forgot to list, which is the usual reason it gets ripped out —
+`github.com` is one to get right, since the house plugins from step 2 are fetched from there on
+the container's first start.
 
 **Host notifications.** Notifications raised inside a container never reach the host desktop, so
 long agent runs finish silently. `assets/notify.sh` sends them out through
