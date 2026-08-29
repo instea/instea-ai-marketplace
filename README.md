@@ -17,7 +17,7 @@ Update later with `/plugin marketplace update instea-ai-marketplace`.
 
 | Plugin | Skills | What it does |
 |---|---|---|
-| [project-setup](plugins/project-setup) | `docker-release-workflow` ⌨️ | Sets up a GitHub Actions workflow that builds each service's Docker image, pushes it to `registry.instea.co`, and cuts a GitHub release from the `package.json` version — scaffolding any missing Dockerfile. |
+| [project-setup](plugins/project-setup) | `docker-release-workflow` ⌨️<br>`devcontainer-claude-sandbox` ⌨️ | Sets up a GitHub Actions workflow that builds each service's Docker image, pushes it to `registry.instea.co`, and cuts a GitHub release from the `package.json` version — scaffolding any missing Dockerfile. Also scaffolds a `.devcontainer/` that runs Claude Code sandboxed inside the project's own container, keeping the agent's config on a named volume instead of the host's `~/.claude`. |
 
 - ⌨️ **explicit** — you start it yourself with a slash command (`/project-setup:docker-release-workflow`).
 - 🤖 **automatic** — Claude invokes it on its own when the task calls for it.

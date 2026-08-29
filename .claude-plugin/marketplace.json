@@ -10,10 +10,10 @@
     {
       "name": "project-setup",
       "source": "./plugins/project-setup",
-      "description": "Instea house standards for project infrastructure. Skill: docker-release-workflow.",
-      "version": "0.1.0",
+      "description": "Instea house standards for project infrastructure. Skills: docker-release-workflow, devcontainer-claude-sandbox.",
+      "version": "0.2.0",
       "category": "development",
-      "keywords": ["docker", "release", "ci"]
+      "keywords": ["docker", "release", "ci", "devcontainer", "sandbox", "claude-code"]
     }
   ]
 }
