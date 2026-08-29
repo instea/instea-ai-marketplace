@@ -1,0 +1,45 @@
+// Instea house standard: Claude Code runs inside this container, never on the host.
+// See plugins/project-setup/skills/devcontainer-claude-sandbox/SKILL.md for the why
+// behind every line here — this repo ships that skill, so keep the two in step.
+{
+  "name": "instea-ai-marketplace (sandboxed)",
+
+  "build": { "dockerfile": "Dockerfile" },
+
+  "features": {
+    // claude-code and the devcontainer CLI both ride on Node.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    // This repo's skills scaffold Dockerfiles and devcontainers; docker-in-docker
+    // is what lets us smoke-test that generated output without leaving the sandbox.
+    // moby:false installs upstream Docker CE — see SKILL.md before changing.
+    "ghcr.io/devcontainers/features/docker-in-docker:3": {
+      "version": "lts",
+      "moby": false
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  // The agent's config lives on a named volume, NOT on the host home directory.
+  // Target must be the remote user's home — `vscode` for devcontainers/base:ubuntu.
+  // Variable substitution does not work here; mounts are applied before the
+  // container env exists, so this path is written out literally.
+  "mounts": [
+    "source=claude-code-config,target=/home/vscode/.claude,type=volume"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "davidanson.vscode-markdownlint",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck"
+      ]
+    }
+  },
+
+  // No forwardPorts: this repo has no app or dev server to reach from the host.
+
+  "postCreateCommand": "bash .devcontainer/postCreateCommand.sh"
+}

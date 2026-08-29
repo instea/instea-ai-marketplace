@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "project-setup@instea-ai-marketplace": true,
+    "skill-creator@claude-plugins-official": true
+  }
+}
