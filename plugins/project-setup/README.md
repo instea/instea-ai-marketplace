@@ -118,6 +118,12 @@ defaults — a per-project config volume, a particular base image, "we don't nee
 (plus `postStartCommand.sh` when the project runs services). The `devcontainer.json` pulls in the
 `claude-code` feature, a language feature, and `docker-in-docker` where the project needs it.
 
+Plus `.claude/settings.json`, declaring `instea-ai-marketplace` and enabling `project-setup` for
+the repo. The container's `~/.claude` is a fresh volume, so nothing installed on the developer's
+laptop crosses into it — without the committed settings file the sandbox has none of the house
+skills. Both keys are required: an `enabledPlugins` entry whose marketplace the container has
+never heard of is dropped silently, with no error to search for.
+
 The security core is the config volume:
 
 ```jsonc
@@ -147,7 +153,9 @@ worse than none.
 1. *Survey* — detects an existing `.devcontainer/` (patched, never overwritten), the stack and
    package manager from the lockfile, whether docker-in-docker is needed, the ports, and the base
    image's remote user; confirms before writing anything.
-2. *Write the files* — from the bundled templates, adapted to what it found.
+2. *Write the files* — from the bundled templates, adapted to what it found, plus the repo's
+   `.claude/settings.json` so the house plugins reach every container. Checks the file is not
+   git-ignored, since that would make the whole step a silent no-op.
 3. *Decide how services run* — compose siblings, or docker-in-docker. This is where the skill
    earns its keep: a rebuild destroys the inner daemon's `/var/lib/docker`, taking the database
    with it, so it either binds data into the workspace or persists the volume, and says which.
@@ -166,12 +174,14 @@ worse than none.
 | `assets/Dockerfile` | Only what the features don't cover |
 | `assets/postCreateCommand.sh` | The four fixes that make the container usable |
 | `assets/postStartCommand.sh` | Brings services up on every start (docker-in-docker only) |
+| `assets/claude-settings.json` | The repo's `.claude/settings.json` — marketplace + `project-setup` |
 | `assets/notify.sh` | Optional — host notifications for long agent runs, via apprise |
 | `scripts/check-devcontainer.py` | Validates the result in step 5 |
 
 `check-devcontainer.py` catches the failures that are invisible in a diff: a mount target that
 doesn't match `remoteUser`, a config volume declared under a compose-based setup (where it is
-silently ignored), a missing postCreate fix, a deprecated top-level `extensions` key. It exits
+silently ignored), a missing postCreate fix, a deprecated top-level `extensions` key, house
+plugins the repo never declares. It exits
 non-zero on real failures and prints `WARN` for judgment calls — read those, don't just check the
 exit code. It keeps `assets/postCreateCommand.sh` honest by grepping for the three fixes that script
 implements, so those two files must be edited together.

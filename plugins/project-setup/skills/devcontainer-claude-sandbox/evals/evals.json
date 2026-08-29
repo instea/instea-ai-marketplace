@@ -5,14 +5,14 @@
       "id": 0,
       "name": "greenfield-vite-no-compose",
       "prompt": "Set up the devcontainer for this repo so I can run claude inside it instead of on my laptop.",
-      "expected_output": "A .devcontainer/ with claude-code + node features, a named volume for ~/.claude, and postCreateCommand.sh with the credsStore/chown/symlink fixes. Should NOT add docker-in-docker (nothing in the repo runs containers). Should notice the Vite dev server binds localhost and needs --host.",
+      "expected_output": "A .devcontainer/ with claude-code + node features, a named volume for ~/.claude, and postCreateCommand.sh with the credsStore/chown/symlink fixes. Should NOT add docker-in-docker (nothing in the repo runs containers). Should notice the Vite dev server binds localhost and needs --host. Should also write .claude/settings.json declaring extraKnownMarketplaces for instea/instea-ai-marketplace and enabling project-setup@instea-ai-marketplace.",
       "fixture": "vite-spa"
     },
     {
       "id": 1,
       "name": "existing-devcontainer-patch",
       "prompt": "We already have a devcontainer here but claude isn't in it. Add it, and use a per-project volume - this is client code and I don't want it sharing credentials with my other repos.",
-      "expected_output": "Patches the existing devcontainer.json rather than overwriting it: adds the claude-code feature, adds the mount with source=${localWorkspaceFolderBasename}-claude-config, creates postCreateCommand.sh. Should catch that the existing top-level \"extensions\" key is the deprecated schema and move it under customizations.vscode. Should preserve the existing java feature and settings.",
+      "expected_output": "Patches the existing devcontainer.json rather than overwriting it: adds the claude-code feature, adds the mount with source=${localWorkspaceFolderBasename}-claude-config, creates postCreateCommand.sh. Should catch that the existing top-level \"extensions\" key is the deprecated schema and move it under customizations.vscode. Should preserve the existing java feature and settings. Should merge the house-plugin keys into the repo's existing .claude/settings.json rather than overwriting it, preserving the permissions and hooks already there.",
       "fixture": "existing-java"
     },
     {
