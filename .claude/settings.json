@@ -2,5 +2,13 @@
   "enabledPlugins": {
     "project-setup@instea-ai-marketplace": true,
     "skill-creator@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "instea-ai-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "instea/instea-ai-marketplace"
+      }
+    }
   }
 }
