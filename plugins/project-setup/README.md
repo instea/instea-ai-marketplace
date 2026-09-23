@@ -140,6 +140,22 @@ user's home, which is why the skill establishes that up front. Choose the source
   in one repo cannot read another's agent credentials. Prefer it for client work. Costs a login
   per project.
 
+**The GitHub CLI**
+
+A repo with a GitHub remote also gets the `github-cli` feature and a token forwarded from a
+*project-prefixed* host variable:
+
+```jsonc
+"remoteEnv": { "GH_TOKEN": "${localEnv:<PROJECT>_GH_TOKEN}" }
+```
+
+A fine-grained, read-only, this-repo-only token — not the developer's usual `GITHUB_TOKEN`.
+Everything in `remoteEnv` is readable by the agent by design, so the token's scope is the only
+real control, and one project's token should never be a key to every other repo on the machine.
+The skill also says the thing people assume the other way round: opened through VS Code, git
+already carries the developer's full identity via a forwarded credential helper, so a read-only gh
+token narrows `gh`, not `git`.
+
 **What it protects, and what it does not**
 
 Protected: the host home directory and its credentials, other checkouts, host-level packages and
@@ -150,12 +166,19 @@ worse than none.
 
 **How it runs**
 
+0. *Version check* — compares the plugin version it is running from against the marketplace's
+   latest, since a cached install is usually months behind and nothing refreshes it automatically.
+   Stale means it tells you the update command and asks whether to carry on; offline means it
+   carries on. (It ships *with* a version, so it first helps the release after the one you install.)
 1. *Survey* — detects an existing `.devcontainer/` (patched, never overwritten), the stack and
-   package manager from the lockfile, whether docker-in-docker is needed, the ports, and the base
-   image's remote user; confirms before writing anything.
+   package manager from the lockfile, whether docker-in-docker is needed, the ports, whether the
+   remote is on GitHub, and the base image's remote user; confirms before writing anything.
 2. *Write the files* — from the bundled templates, adapted to what it found, plus the repo's
    `.claude/settings.json` so the house plugins reach every container. Checks the file is not
-   git-ignored, since that would make the whole step a silent no-op.
+   git-ignored, since that would make the whole step a silent no-op. `postCreateCommand.sh` then
+   reads that same file at container creation and installs what it declares, so the first session
+   starts with the house skills already there — and chowns the global npm package so Claude Code
+   can actually update itself instead of failing with `no write permission to npm prefix`.
 3. *Decide how services run* — compose siblings, or docker-in-docker. This is where the skill
    earns its keep: a rebuild destroys the inner daemon's `/var/lib/docker`, taking the database
    with it, so it either binds data into the workspace or persists the volume, and says which.
@@ -177,6 +200,7 @@ worse than none.
 | `assets/claude-settings.json` | The repo's `.claude/settings.json` — marketplace + `project-setup` |
 | `assets/notify.sh` | Optional — host notifications for long agent runs, via apprise |
 | `scripts/check-devcontainer.py` | Validates the result in step 5 |
+| `../../scripts/check-plugin-version.sh` | Plugin-level — the step 0 staleness check |
 
 `check-devcontainer.py` catches the failures that are invisible in a diff: a mount target that
 doesn't match `remoteUser`, a config volume declared under a compose-based setup (where it is

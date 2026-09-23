@@ -18,6 +18,9 @@
       "version": "lts",
       "moby": false
     },
+    // gh, for issues and PRs from inside the sandbox. It reads GH_TOKEN below;
+    // without one it is installed but not logged in.
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
 
@@ -28,6 +31,15 @@
   "mounts": [
     "source=claude-code-config,target=/home/vscode/.claude,type=volume"
   ],
+
+  // A fine-grained, read-only token for this repo only, exported on the host as
+  // INSTEA_MARKETPLACE_GH_TOKEN. The name is project-prefixed on purpose:
+  // everything in remoteEnv is readable by the agent, so a token that leaks here
+  // must not be a key to every other Instea repo. Unset expands to an empty
+  // string with no error — `gh auth status` inside is how you notice.
+  "remoteEnv": {
+    "GH_TOKEN": "${localEnv:INSTEA_MARKETPLACE_GH_TOKEN}"
+  },
 
   "customizations": {
     "vscode": {
