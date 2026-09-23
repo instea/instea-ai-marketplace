@@ -18,6 +18,8 @@
       "version": "lts",
       "moby": false
     },
+    // ADAPT: drop this pair of lines on a repo with no GitHub remote.
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
 
@@ -29,6 +31,15 @@
   "mounts": [
     "source=claude-code-config,target=/home/vscode/.claude,type=volume"
   ],
+
+  // ADAPT: <PROJECT>_GH_TOKEN, a fine-grained read-only token for THIS repo only.
+  // The name is project-prefixed on purpose — everything in remoteEnv is readable
+  // by the agent, so scope is the only real control, and one container's token
+  // must not be a key to every other repo. An unset variable expands to an empty
+  // string with no error; gh is then simply not logged in. See SKILL.md step 2.
+  "remoteEnv": {
+    "GH_TOKEN": "${localEnv:<PROJECT>_GH_TOKEN}"
+  },
 
   // ADAPT: read these from the dev script and any compose ports.
   // Ignored by the devcontainer CLI (devcontainers/cli#186) — IDE users only.

@@ -134,8 +134,40 @@ def main() -> int:
             ("symlinks .claude.json", r"ln -s[^\n]*\.claude\.json"),
         ):
             (ok if re.search(pat, body) else bad)(f"postCreate {label}", pc.name)
+        # Newer fixes: WARN, not FAIL — devcontainers generated before these existed
+        # are still correct, just missing an improvement.
+        if not re.search(r"chown[^\n]*(npm root -g|npm_root|node_modules)", body):
+            warn(
+                "postCreate does not chown the global npm package dir",
+                "claude cannot self-update: 'no write permission to npm prefix' — see fix 4 in SKILL.md",
+            )
+        if not re.search(r"claude plugin (install|marketplace)", body):
+            warn(
+                "postCreate does not pre-install the plugins the repo declares",
+                "the first session fetches them mid-task instead — see fix 5 in SKILL.md",
+            )
         if re.search(r"/home/(vscode|node|codespace)\b", body):
             warn("postCreate hardcodes a user path; prefer $HOME / id -un", pc.name)
+
+    # --- the GitHub CLI and its token ---
+    if has("github-cli"):
+        remote_env = dc.get("remoteEnv") or {}
+        tok = remote_env.get("GH_TOKEN") or remote_env.get("GITHUB_TOKEN") or ""
+        if not tok:
+            warn(
+                "github-cli feature with no GH_TOKEN in remoteEnv",
+                "gh installs but is never logged in, silently — see 'The GitHub CLI' in SKILL.md",
+            )
+        else:
+            m = re.search(r"\$\{localEnv:([^}]+)\}", str(tok))
+            src = m.group(1) if m else ""
+            if src in ("GH_TOKEN", "GITHUB_TOKEN"):
+                warn(
+                    "gh token comes from a shared host variable",
+                    f"${{localEnv:{src}}} is the developer's all-repo token; prefer <PROJECT>_GH_TOKEN",
+                )
+            elif src:
+                ok("gh token from a project-prefixed host variable", src)
 
     # --- deprecated schema ---
     for key in ("extensions", "settings"):

@@ -53,12 +53,91 @@ Two causes, in order of likelihood:
    *remote user's* home. Verify from inside with
    `mount | grep claude` and compare against `echo $HOME`.
 
+### `Auto-update failed: no write permission to npm prefix`
+
+Claude Code says it cannot update itself, and stays on the version the image shipped.
+
+The `claude-code` feature installs the npm package as root, so the remote user cannot overwrite
+it. Confirm both halves:
+
+```bash
+cat ~/.claude/.last-update-result.json     # "path":"npm-global","status":"no_permissions"
+ls -ld "$(npm root -g)/@anthropic-ai"      # owned by root, not by you
+```
+
+Fix 4 of `postCreateCommand.sh` chowns that subtree; if it is missing, the same command applies by
+hand:
+
+```bash
+sudo chown -R "$(id -un):$(id -gn)" "$(npm root -g)/@anthropic-ai"
+claude update
+```
+
+Note that the npm prefix itself is normally already group-writable — chowning the whole prefix is
+not needed and is a bigger change than it looks. And the update lives in the container filesystem,
+not on the config volume, so a rebuild goes back to the feature's version. That is intended.
+
+### The house skills aren't there in a fresh container
+
+`/project-setup:...` doesn't resolve, and `claude plugin list` is empty.
+
+Work through it in this order:
+
+1. **Is `.claude/settings.json` committed and un-ignored?** `git check-ignore -v .claude/settings.json`.
+   A repo that ignores `.claude/` wholesale makes the whole mechanism a no-op for everyone but the
+   person who wrote it.
+2. **Does it have both keys?** `extraKnownMarketplaces` *and* `enabledPlugins`. An enable naming a
+   marketplace the fresh volume has never heard of is dropped as an orphaned entry, silently.
+3. **Did fix 5 run?** It is skipped without network, without `jq`, or when `claude` is not yet on
+   the PATH at postCreate time. Re-run it by hand:
+   `claude plugin marketplace add <owner>/<repo> && claude plugin install <plugin>@<marketplace> --scope project`.
+   Both commands are safe to repeat — an already-installed plugin reports its version and exits 0.
+
+### The skill scaffolded something that doesn't match the current standard
+
+The plugin in the user's cache is not the one in the marketplace — installs do not refresh
+themselves. `claude plugin list --json` shows the installed version;
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-plugin-version.sh"` compares it against the marketplace
+and prints one line. `claude plugin update <plugin>@<marketplace>` fixes it, and **it only takes
+effect after a restart** — a session that keeps running is still on the old copy.
+
 ### The volume exists but is empty after a rebuild
 
 Check you didn't rebuild with a different `source=` name — changing it (for example switching to
 `${localWorkspaceFolderBasename}-claude-config`) creates a fresh, empty volume and leaves the old
 one behind. `docker volume ls | grep claude` shows both. Data is recoverable; the old volume is
 still there.
+
+## GitHub CLI
+
+### `gh` is installed but not logged in
+
+Most likely the host variable behind `remoteEnv` is not exported. `${localEnv:FOO}` on an unset
+variable expands to an empty string — the container starts normally and nothing reports it:
+
+```bash
+echo "${GH_TOKEN:-<empty>}"   # inside the container
+gh auth status
+```
+
+Export `<PROJECT>_GH_TOKEN` in the host shell profile (not just in one terminal — the IDE does not
+inherit it from a shell you happened to have open) and **rebuild or restart the container**;
+`remoteEnv` is read at container start, so an export made afterwards does not reach it.
+
+### `gh` can read but every write is refused
+
+That is the intended shape: the house standard uses a fine-grained token scoped to this repo with
+read-only permissions. If the project genuinely needs the agent to open PRs or comment, raise the
+specific permission on the token rather than swapping in a classic PAT — a classic PAT's `repo`
+scope covers every repository the user can reach, which is exactly what the per-project token
+exists to avoid.
+
+### `git push` works even though the token is read-only
+
+Not a bug, and worth understanding. Opened through VS Code, the Dev Containers extension installs
+a git credential helper into the container's `/etc/gitconfig` that proxies to the host's credential
+store, so git operations run as the developer's full GitHub identity independently of `GH_TOKEN`.
+`git config --show-origin --get credential.helper` shows it. The gh token narrows `gh`, not `git`.
 
 ## Networking
 

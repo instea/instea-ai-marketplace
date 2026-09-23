@@ -25,9 +25,9 @@ This skill is invoked explicitly, so anything the user typed after the command n
 deliberate instruction — a target directory, a language, "no docker-in-docker", "add the
 firewall". Honour it, and let it override the defaults below rather than re-asking in step 1.
 
-Work through the six steps in order. Steps 1 to 3 carry the judgment; 4 to 6 are mostly
-mechanical but catch the failures that would otherwise show up as a broken container on
-someone else's machine.
+Run the version check in step 0 first, then work through the six steps in order. Steps 1 to 3
+carry the judgment; 4 to 6 are mostly mechanical but catch the failures that would otherwise show
+up as a broken container on someone else's machine.
 
 ## What this protects, and what it does not
 
@@ -43,6 +43,28 @@ risk. Network egress is unrestricted unless you add the firewall (see Optional a
 anything in the container can still reach the internet. And any value passed through
 `remoteEnv` is readable by the agent, by design.
 
+## Step 0 — Check you are running the current house standard
+
+You are running from whatever version of this plugin is in the user's cache, and nothing updates
+that automatically. Months-old copies are the normal case, not the exception — so check before
+scaffolding a standard that has since moved on:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-plugin-version.sh"
+```
+
+One line out, exit 3 when stale. It skips itself when the plugin root is a checkout of the
+marketplace (working in the marketplace repo, or `claude --plugin-dir`), and treats being offline
+as unknown rather than as a failure — never block a scaffold on it.
+
+If it reports STALE, say so, give the user the update command it prints, and add that **a restart
+is required** before the new version loads. Then ask whether to continue on the version you have
+or stop and update — either answer is reasonable, and it is their call. Do not update the plugin
+yourself.
+
+One honest limitation to keep in mind: this check ships *with* a version, so a user still on an
+older one will never run it. The first time it helps is the release after the one they install.
+
 ## Step 1 — Survey the project
 
 **Check for an existing `.devcontainer/` first.** If one exists, do not overwrite it — read it,
@@ -54,7 +76,7 @@ that are invisible from the outside.
 ls -la .devcontainer/ 2>/dev/null && cat .devcontainer/devcontainer.json
 ```
 
-Then gather four things:
+Then gather five things:
 
 **The stack and package manager.** The lockfile is the authority, not the README:
 `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm. Node repos get
@@ -71,6 +93,10 @@ image architectures.
 **The ports.** Read the dev script and any compose `ports:` entries rather than assuming the
 framework default; these become `forwardPorts`.
 
+**Whether the repo lives on GitHub.** `git remote -v` — if the remote is GitHub, the scaffold
+gets the `github-cli` feature and a project-prefixed token variable (step 2 covers the naming and
+why it is not the host's usual `GITHUB_TOKEN`). No GitHub remote, no feature.
+
 **The remote user.** This one matters more than it looks. It comes from the base image —
 `mcr.microsoft.com/devcontainers/base:ubuntu` gives you `vscode`, the Node images give you
 `node` — and the config volume must be mounted at *that* user's home. Mount it at the wrong
@@ -79,9 +105,10 @@ so logins stop persisting and nobody can see why.
 
 **Confirm before writing.** This is the one place to ask, so cover everything you need in three
 or four lines: the base image and remote user, the features you're adding, the ports, whether the
-config volume is shared or per-project (step 2 explains the trade-off), and how the project's
-services will run if it has any (step 3). Getting the remote user or the volume path wrong
-produces a container that looks fine and quietly loses state, so it is worth the one round-trip.
+config volume is shared or per-project (step 2 explains the trade-off), the host variable name the
+gh token will come from, and how the project's services will run if it has any (step 3). Getting
+the remote user or the volume path wrong produces a container that looks fine and quietly loses
+state, so it is worth the one round-trip.
 
 ## Step 2 — Write the devcontainer files
 
@@ -95,6 +122,7 @@ Copy what applies from `assets/`, then adapt:
 | `assets/postStartCommand.sh` | Bringing services up on every start (step 3, option B only) |
 | `assets/claude-settings.json` | The repo's `.claude/settings.json` — the house plugins |
 | `scripts/check-devcontainer.py` | Validates the result in step 5 |
+| `../../scripts/check-plugin-version.sh` | Plugin-level; the staleness check from step 0 |
 
 ### The config volume
 
@@ -126,11 +154,11 @@ You raised this in step 1's confirmation — don't ask again here, just apply wh
 Keep it thin. Features already install the language toolchain, Docker, and Claude Code, so this
 file is only for things the team expects in every shell.
 
-**Always install `jq`**, even when nothing needs it yet. Claude Code hooks are shell scripts that
-parse a JSON payload from stdin, so the first hook anyone adds needs it — and discovering that
-inside a container, from a hook that fails silently, is a bad afternoon. This is why a new
-scaffold gets a Dockerfile rather than pointing `"image"` straight at the base: one small layer
-now beats a rebuild later.
+**Always install `jq`.** `postCreateCommand.sh` reads `.claude/settings.json` with it to install
+the repo's plugins, and Claude Code hooks are shell scripts that parse a JSON payload from stdin,
+so the first hook anyone adds needs it too — discovering that inside a container, from a hook that
+fails silently, is a bad afternoon. This is why a new scaffold gets a Dockerfile rather than
+pointing `"image"` straight at the base: one small layer now beats a rebuild later.
 
 When you are *patching* an existing image-only devcontainer, converting it to a build purely for
 `jq` is a bigger change than it looks — it moves the project onto a locally-built image. Either
@@ -140,6 +168,46 @@ just say in the handover which you did and why.
 Combine the `apt-get` calls into one `RUN` with `rm -rf /var/lib/apt/lists/*` at the end;
 separate `RUN apt-get install` lines each keep their own layer of package index, and a stale
 `apt-get update` layer causes install failures weeks later that look like network errors.
+
+### The GitHub CLI
+
+A repo with a GitHub remote gets `ghcr.io/devcontainers/features/github-cli:1`. Almost everything
+the agent wants to do with GitHub — reading an issue, checking why CI is red, looking at a PR
+diff — goes through `gh`, and without it the agent falls back to scraping the web or asking you.
+
+How the token gets in is the part worth thinking about:
+
+```jsonc
+"remoteEnv": { "GH_TOKEN": "${localEnv:<PROJECT>_GH_TOKEN}" }
+```
+
+Three deliberate choices in that one line:
+
+- **A fine-grained token, read-only, scoped to this repository.** Contents, Metadata, Issues and
+  Pull requests at *Read*. Write access turns "the agent can look things up" into "the agent can
+  push, merge and close things" — offer it only if the user asks, and say plainly what it buys
+  and costs. A classic PAT is the wrong instrument here: its `repo` scope covers every repo the
+  user can reach, which is precisely what the project prefix exists to prevent.
+- **A project-prefixed host variable**, not the `GITHUB_TOKEN` the developer already has exported.
+  Everything in `remoteEnv` is readable by the agent by design, so the token's scope is the only
+  real control — and a shared variable means the token in this container is a key to every other
+  repo on the machine. `<PROJECT>_GH_TOKEN` keeps one project's blast radius to one project.
+- **`GH_TOKEN`, not `GITHUB_TOKEN`, as the container-side name.** `gh` reads both, but
+  `GITHUB_TOKEN` is also what Actions injects, and reusing it makes the local value hard to tell
+  apart from CI's later.
+
+Two things to warn about, because both fail quietly:
+
+`${localEnv:FOO}` on a variable the host has not exported expands to an empty string — no error,
+no warning, and `gh` is simply not logged in. `gh auth status` inside the container is the check;
+put it in the handover.
+
+And be honest about what this does *not* isolate: opened through VS Code, the Dev Containers
+extension installs a git credential helper into the container's `/etc/gitconfig` that proxies to
+the host's credential store, so `git push` already runs as the developer's full GitHub identity no
+matter what `GH_TOKEN` says. A read-only gh token narrows what `gh` can do, not what `git` can do.
+(The devcontainer CLI does not install that helper, so terminal-only users get the gh token and
+nothing else — which also means `git push` will ask them for credentials.)
 
 ### Extensions
 
@@ -199,6 +267,13 @@ consulted; the pattern has to exclude the contents (`.claude/*`) for the negatio
 `git check-ignore -v` names the line that decided, which is the quickest way to see this.
 
 Tell the user to commit the file in the handover.
+
+Fix 5 of `postCreateCommand.sh` then reads this same file at container creation and installs what
+it declares, so the first session starts with the house skills already present instead of fetching
+them halfway through your first request. It reads the file rather than hardcoding the two house
+names, which is what keeps it correct for a repo that later adds a third plugin. Nothing in that
+block is fatal — a container built without network is still a usable container, and Claude Code
+falls back to fetching the marketplace on first start, which is the behaviour you get today.
 
 The equivalent CLI is `claude plugin marketplace add instea/instea-ai-marketplace --scope project`
 followed by `claude plugin install project-setup@instea-ai-marketplace --scope project`. It writes
@@ -361,7 +436,10 @@ devcontainer build --workspace-folder .
 `check-devcontainer.py` covers the failures that are invisible in a diff: a mount target that
 doesn't match `remoteUser`, a config volume declared in `devcontainer.json` under a compose-based
 setup (where it is ignored), a missing fix in the postCreate script, a deprecated top-level
-`extensions` key, docker-in-docker over a compose file with no persistence. It exits non-zero on
+`extensions` key, docker-in-docker over a compose file with no persistence, a `github-cli` feature
+with no token or a token taken from a shared host variable, and the two newer postCreate fixes —
+the npm chown and the plugin warm-up — which are WARNs rather than FAILs so that devcontainers
+generated by an earlier version of this skill don't start failing. It exits non-zero on
 real failures and prints `WARN` for judgment calls that may be right for the project — read
 those, don't just check the exit code.
 
@@ -391,17 +469,24 @@ Close with a short handover covering exactly these points:
    it across rebuilds. If it ever stops persisting, the symlink in fix 3 of the postCreate
    script is the thing to check.
 3. **The house plugins** — `.claude/settings.json` must be committed or nobody else gets them.
-   The first Claude Code start inside the container fetches the marketplace from GitHub and asks
-   once to trust `project-setup`; that first run needs network.
-4. **Ports** — what is forwarded, and the CLI caveat from step 4.
-5. **What you verified** — the build result, or plainly that you could not build it here.
-6. **What the sandbox does not cover** — the "Not protected" list above, in one line. People
+   `postCreateCommand.sh` installs them at container creation, so they are there before the first
+   prompt; Claude Code still asks once to trust `project-setup`. If the container was built
+   without network, the first session fetches the marketplace instead — that run needs network.
+4. **The gh token** — the host variable the container expects (`<PROJECT>_GH_TOKEN`), what it
+   should be (a fine-grained, read-only, this-repo-only token), and that it must be exported in
+   the host shell profile *before* reopening the container. Tell them to confirm with
+   `gh auth status` inside, since an unset variable produces no error at all. Say in the same
+   breath that this does not constrain `git` itself — VS Code forwards the host's git credentials
+   separately.
+5. **Ports** — what is forwarded, and the CLI caveat from step 4.
+6. **What you verified** — the build result, or plainly that you could not build it here.
+7. **What the sandbox does not cover** — the "Not protected" list above, in one line. People
    will run the agent with loosened permissions on the strength of this setup; they should know
    the repo is still live and egress is still open.
-7. **What a rebuild will cost** — if the project ended up on docker-in-docker, state plainly
+8. **What a rebuild will cost** — if the project ended up on docker-in-docker, state plainly
    whether a rebuild wipes the database and image cache, and what you did about it. This is the
    single most surprising behaviour in the whole setup, and the developer will hit it.
-8. **Superseded setup** — if the repo has a `Vagrantfile`, an ad-hoc `docker-compose` dev
+9. **Superseded setup** — if the repo has a `Vagrantfile`, an ad-hoc `docker-compose` dev
    service, or a README section telling people to install Node locally, point out the overlap.
    Don't delete it; retiring the old path is the team's call.
 
@@ -424,6 +509,21 @@ the `.claude` directory, not inside it — so the volume alone does not persist 
 cannot bind-mount a file that doesn't exist yet, which rules out the obvious fix, so the script
 creates the file inside the volume and symlinks it into the home directory. The `[ -f ... ] ||`
 guard is what stops a rebuild from wiping an existing session.
+
+**`chown` on `$(npm root -g)/@anthropic-ai`.** The claude-code feature installs the npm package
+as root, so the remote user's auto-update fails with `Auto-update failed: no write permission to
+npm prefix` and the container is stuck on whatever version the image shipped — a message that
+reads like an npm misconfiguration and sends people off editing `.npmrc`. Only that one subtree is
+root-owned; the npm prefix itself is already group-writable, so chowning the package is the whole
+fix. `~/.claude/.last-update-result.json` records the outcome, which is the quickest confirmation.
+The update lands in the container's filesystem rather than on the config volume, so a rebuild drops
+back to the feature's version — that part is intended, since the image is what pins the baseline.
+
+**Reading `.claude/settings.json` in fix 5 rather than hardcoding the plugin names.** The block
+exists so the house skills are installed before the first prompt, and the committed settings file
+is the one place that already knows which plugins a repo wants. Hardcoding the two house names
+would work today and be wrong the moment a project adds a third. It also means the failure mode is
+benign: no settings file, no jq, no network, and the script simply does nothing.
 
 **`"moby": false` on docker-in-docker.** Installs upstream Docker CE rather than the Moby
 build. Set it deliberately: the two differ in versioning and in which architectures they work
