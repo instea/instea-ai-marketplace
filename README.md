@@ -7,8 +7,8 @@ Instea's Claude Code plugin marketplace — shared skills, plugins and house sta
 In Claude Code, add the marketplace once, then install the plugins you want:
 
 ```
-/plugin marketplace add AdamH4/private-ai-marketplace
-/plugin install project-setup@private-ai-marketplace
+/plugin marketplace add instea/instea-ai-marketplace
+/plugin install project-setup@instea-ai-marketplace
 ```
 
 Update later with `/plugin marketplace update instea-ai-marketplace`.
