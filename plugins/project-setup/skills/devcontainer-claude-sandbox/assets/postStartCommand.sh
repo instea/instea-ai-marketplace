@@ -21,3 +21,7 @@ docker compose up -d
 # Optional: block until the database is actually accepting queries, so the first
 # command in a fresh shell doesn't fail on a connection refused.
 # timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -q; do sleep 1; done'
+
+if command -v gh >/dev/null 2>&1; then
+  gh auth setup-git --hostname github.com
+fi
