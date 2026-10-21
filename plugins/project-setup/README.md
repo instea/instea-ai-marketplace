@@ -17,6 +17,7 @@ hand-rolled variant.
 |---|---|---|
 | `docker-release-workflow` | ⌨️ explicit | GitHub Actions workflow that builds and publishes each service's Docker image and cuts a GitHub release |
 | `devcontainer-claude-sandbox` | ⌨️ explicit | `.devcontainer/` that runs Claude Code sandboxed inside the project's own container, with the agent's config on a named volume instead of the host's `~/.claude` |
+| `best-practices-audit` | ⌨️ explicit | Audits a project against focused best-practice rulesets and reports violations only, each with a fix |
 
 - ⌨️ **explicit** — you start it yourself with a slash command; Claude never runs it on its own
   (the skill sets `disable-model-invocation: true`).
@@ -215,6 +216,39 @@ implements, so those two files must be edited together.
 `skills/devcontainer-claude-sandbox/references/troubleshooting.md` covers the failures this setup
 actually produces — credsStore errors, `~/.claude` permission denials, logins that don't persist,
 the app not being reachable from the host, and rebuilds that wipe the database.
+
+### `best-practices-audit` ⌨️
+
+Checks an existing project against small, focused rulesets and reports only what violates them —
+never passes — each finding with a one-line fix. Read-only: it changes nothing.
+
+**Invoke it explicitly:**
+
+```
+/project-setup:best-practices-audit
+```
+
+Name a scope after the command to narrow it — "only testing", "just `apps/web`".
+
+**How it runs**
+
+1. *Pick rulesets* — detects the stack from marker files (root and workspace packages) and loads
+   only the matching rulesets.
+2. *Check rules* — each rule is `mechanical` (file listings, grep, one config file) or `judgment`
+   (opens only the files its hint points to); the repo is never read wholesale. With 2+ rulesets
+   and a subagent tool available, each ruleset runs in its own subagent in parallel.
+3. *Report* — one table sorted by severity, at most 5 locations per rule, plus the rules it
+   couldn't check and why.
+
+**Rulesets** (`skills/best-practices-audit/references/`)
+
+| File | Applies when | Covers |
+|---|---|---|
+| `js-project-setup.md` (`JS-*`) | `package.json` present | pnpm as package manager, no foreign lockfiles, pinned pnpm and Node versions, frozen-lockfile CI installs, supply-chain settings (`minimumReleaseAge`, `allowBuilds`, `trustPolicy`) |
+| `testing.md` (`TEST-*`) | Playwright / Vitest / Jest config, or `test`/`e2e` scripts | E2E against a production build rather than the dev server, separate unit and e2e scripts, no stray server reuse in CI, stable selectors, no fixed waits |
+
+Rule IDs are stable — new rules are appended, existing ones never renumbered — so findings in past
+reports keep pointing at the same rule.
 
 ## Adding a skill to this plugin
 

@@ -1,11 +1,11 @@
 {
   "name": "project-setup",
-  "description": "Instea house standards for bootstrapping project infrastructure — CI, Docker, release pipelines and sandboxed dev environments.",
-  "version": "0.4.0",
+  "description": "Instea house standards for bootstrapping project infrastructure — CI, Docker, release pipelines and sandboxed dev environments — plus best-practice audits of existing projects.",
+  "version": "0.6.0",
   "author": {
     "name": "Instea"
   },
   "homepage": "https://github.com/instea/instea-ai-marketplace/tree/main/plugins/project-setup",
   "license": "MIT",
-  "keywords": ["docker", "github-actions", "release", "ci", "devcontainer", "sandbox", "claude-code", "instea"]
+  "keywords": ["docker", "github-actions", "release", "ci", "devcontainer", "sandbox", "claude-code", "audit", "best-practices", "instea"]
 }
