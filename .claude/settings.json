@@ -4,12 +4,6 @@
     "skill-creator@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
-    "private-instea-ai-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "instea/private-instea-ai-marketplace"
-      }
-    },
     "instea-ai-marketplace": {
       "source": {
         "source": "github",
