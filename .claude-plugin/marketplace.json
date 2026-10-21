@@ -1,15 +1,16 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "private-ai-marketplace",
-  "description": "Private collection of Claude Code plugins and skills.",
+  "name": "instea-ai-marketplace",
+  "description": "Instea's collection of Claude Code plugins and skills.",
   "owner": {
-    "name": "AdamH4"
+    "name": "Instea",
+    "url": "https://instea.co"
   },
   "plugins": [
     {
       "name": "project-setup",
       "source": "./plugins/project-setup",
-      "description": "Private standards for project infrastructure. Skills: docker-release-workflow, devcontainer-claude-sandbox.",
+      "description": "Instea house standards for project infrastructure. Skills: docker-release-workflow, devcontainer-claude-sandbox.",
       "version": "0.5.0",
       "category": "development",
       "keywords": ["docker", "release", "ci", "devcontainer", "sandbox", "claude-code"]

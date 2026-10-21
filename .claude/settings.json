@@ -1,13 +1,13 @@
 {
   "enabledPlugins": {
-    "project-setup@privsate-ai-marketplace": true,
+    "project-setup@instea-ai-marketplace": true,
     "skill-creator@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
-    "private-ai-marketplace": {
+    "instea-ai-marketplace": {
       "source": {
         "source": "github",
-        "repo": "AdamH4/private-ai-marketplace"
+        "repo": "instea/instea-ai-marketplace"
       }
     }
   }
