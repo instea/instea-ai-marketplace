@@ -22,6 +22,8 @@ docker compose up -d
 # command in a fresh shell doesn't fail on a connection refused.
 # timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -q; do sleep 1; done'
 
-if command -v gh >/dev/null 2>&1; then
+if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
   gh auth setup-git --hostname github.com
+else
+  echo "No valid GitHub auth (GH_TOKEN unset/invalid); skipping git credential setup." >&2
 fi
