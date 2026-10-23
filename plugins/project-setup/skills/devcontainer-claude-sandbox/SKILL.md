@@ -241,6 +241,17 @@ heard of; Claude Code drops it as an orphaned entry and starts with the plugin a
 anywhere — the skills are simply not there, and the developer has nothing to search for.
 `extraKnownMarketplaces` is what registers the source so the enable resolves. The two are a pair.
 
+**The private marketplace needs a token.** `assets/claude-settings.json` also registers
+`instea/private-instea-ai-marketplace`, a private repository. Remind the user that to use the
+private plugins they need a **fine-grained GitHub PAT** with:
+
+- **Resource owner:** the Instea organization
+- **Repository access:** only `instea/private-instea-ai-marketplace`
+- **Permissions:** `Contents` (Read-only)
+
+Without it the clone fails and the private plugins are missing. Say this in step 1's confirmation
+and again in the handover, since nothing else will tell them.
+
 **Merge, never overwrite.** Plenty of repos already keep `permissions` or `hooks` here — the
 notify.sh addition below writes hooks into this very file. Merge into the two objects and preserve
 every existing member, the same way step 1 patches an existing `.devcontainer/` rather than
@@ -472,6 +483,8 @@ Close with a short handover covering exactly these points:
    `postCreateCommand.sh` installs them at container creation, so they are there before the first
    prompt; Claude Code still asks once to trust `project-setup`. If the container was built
    without network, the first session fetches the marketplace instead — that run needs network.
+   For the private plugins, remind them to create the fine-grained PAT from step 2 (resource
+   owner Instea, repository `instea/private-instea-ai-marketplace`, `Contents` read-only).
 4. **The gh token** — the host variable the container expects (`<PROJECT>_GH_TOKEN`), what it
    should be (a fine-grained, read-only, this-repo-only token), and that it must be exported in
    the host shell profile *before* reopening the container. Tell them to confirm with

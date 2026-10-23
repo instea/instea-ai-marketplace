@@ -11,7 +11,7 @@
       "name": "project-setup",
       "source": "./plugins/project-setup",
       "description": "Instea house standards for project infrastructure. Skills: docker-release-workflow, devcontainer-claude-sandbox, best-practices-audit.",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "category": "development",
       "keywords": ["docker", "release", "ci", "devcontainer", "sandbox", "claude-code", "audit", "best-practices"]
     }
