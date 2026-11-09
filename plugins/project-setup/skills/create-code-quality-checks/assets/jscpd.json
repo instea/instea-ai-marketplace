@@ -1,0 +1,17 @@
+{
+  "threshold": 3,
+  "minTokens": 30,
+  "gitignore": true,
+  "reporters": ["console"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/pnpm-lock.yaml",
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/uv.lock",
+    "**/poetry.lock"
+  ]
+}

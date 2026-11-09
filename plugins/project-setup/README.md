@@ -18,6 +18,7 @@ hand-rolled variant.
 | `docker-release-workflow` | ⌨️ explicit | GitHub Actions workflow that builds and publishes each service's Docker image and cuts a GitHub release |
 | `devcontainer-claude-sandbox` | ⌨️ explicit | `.devcontainer/` that runs Claude Code sandboxed inside the project's own container, with the agent's config on a named volume instead of the host's `~/.claude` |
 | `best-practices-audit` | ⌨️ explicit | Audits a project against focused best-practice rulesets and reports violations only, each with a fix |
+| `create-code-quality-checks` | ⌨️ explicit | Create code quality checks for your repository |
 
 - ⌨️ **explicit** — you start it yourself with a slash command; Claude never runs it on its own
   (the skill sets `disable-model-invocation: true`).
@@ -249,6 +250,42 @@ Name a scope after the command to narrow it — "only testing", "just `apps/web`
 
 Rule IDs are stable — new rules are appended, existing ones never renumbered — so findings in past
 reports keep pointing at the same rule.
+
+
+### `create-code-quality-checks` ⌨️
+
+Sets up deterministic quality checks in a TS/JS and/or Python repo. Each stack gets one local
+`check` command, and the CI pipeline calls the same commands, so every CI failure reproduces on
+your machine.
+
+**Invoke it explicitly:**
+
+```
+/project-setup:create-code-quality-checks [project path]
+```
+
+The path defaults to the current directory.
+
+**How it works**
+
+1. Detects the stacks, package managers, existing tools, frameworks, git hooks and CI platform
+   (taken from the git remote: GitHub by default, also GitLab, Bitbucket and Azure DevOps). It exits
+   on an empty repo or a repo with only other languages.
+2. Shows what it found, then asks you:
+   - for each tool that differs from the house opinion, whether to switch or keep it;
+   - the severity for every check, `error` or `warning`;
+   - whether to install git hooks.
+3. Applies configs, scripts/tasks, hooks and CI jobs. It extends existing configs in place, and your
+   settings win over house rules. It adds jobs to an existing pipeline instead of creating a new one.
+4. Runs every command, then `check`. It fixes its own configuration until every remaining failure
+   is a real finding in the code.
+5. Summarizes each of your decisions and what came of it.
+
+**What you get**
+
+- Config files, scripts or tasks, and pinned dev dependencies.
+- CI jobs that skip a stack's checks when a change doesn't touch it. The audit runs on PRs/MRs only.
+- In warning mode, `docs/code-quality.md`, which explains how to switch each check to error.
 
 ## Adding a skill to this plugin
 

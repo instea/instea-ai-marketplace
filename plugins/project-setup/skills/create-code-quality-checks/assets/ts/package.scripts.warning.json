@@ -1,0 +1,34 @@
+{
+  "scripts": {
+    "lint": "eslint .",
+    "format:check": "prettier --check . || exit 0",
+    "typecheck": "tsc --noEmit || exit 0",
+    "build:check": "pnpm build || exit 0",
+    "knip": "knip --no-exit-code",
+    "duplication": "jscpd --format typescript,javascript,tsx,jsx .",
+    "audit": "pnpm audit --prod --audit-level=high || exit 0",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm build:check && pnpm knip && pnpm duplication && pnpm run audit"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,scss,yml,yaml}": "prettier --write"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-sonarjs": "4.2.2",
+    "eslint-plugin-unicorn": "79.0.0",
+    "globals": "17.14.0",
+    "husky": "9.1.7",
+    "jscpd": "5.4.2",
+    "knip": "6.44.1",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}
