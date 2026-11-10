@@ -12,3 +12,4 @@ All four shipped in project-setup 0.4.0. Follow-ups worth considering:
 * [ ] - evals: the fixtures have no GitHub remote, so nothing exercises the gh CLI branch or the
         step 0 version check; add a fixture with a remote if we want those covered
 * [ ] - docker-release-workflow could adopt scripts/check-plugin-version.sh in its own step 0
+* [ ] - check for obsolete/not maintained/exotic/beta dependencies

@@ -19,6 +19,7 @@ hand-rolled variant.
 | `devcontainer-claude-sandbox` | ⌨️ explicit | `.devcontainer/` that runs Claude Code sandboxed inside the project's own container, with the agent's config on a named volume instead of the host's `~/.claude` |
 | `best-practices-audit` | ⌨️ explicit | Audits a project against focused best-practice rulesets and reports violations only, each with a fix |
 | `create-code-quality-checks` | ⌨️ explicit | Create code quality checks for your repository |
+| `agent-browser-setup` | ⌨️ explicit | Lets Claude Code in a dev container drive a separate agent Brave/Chrome on the Windows host through the `chrome-devtools` MCP server |
 
 - ⌨️ **explicit** — you start it yourself with a slash command; Claude never runs it on its own
   (the skill sets `disable-model-invocation: true`).
@@ -286,6 +287,47 @@ The path defaults to the current directory.
 - Config files, scripts or tasks, and pinned dev dependencies.
 - CI jobs that skip a stack's checks when a change doesn't touch it. The audit runs on PRs/MRs only.
 - In warning mode, `docs/code-quality.md`, which explains how to switch each check to error.
+
+### `agent-browser-setup` ⌨️
+
+Gives Claude Code inside a dev container a browser to drive: a separate **agent Brave** (or Chrome)
+on the Windows host, with its own profile and logins, reached through the
+[chrome-devtools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) and the
+browser's consent-based remote debugging. The container never launches a throwaway browser, and
+the browser asks you to **Allow** every connection.
+
+**Invoke it explicitly:**
+
+```
+/project-setup:agent-browser-setup
+```
+
+**What you get**
+
+- `.devcontainer/chrome-bridge/` — the bridge kit: `mcp-server.sh` (relays container
+  `127.0.0.1:9333` to `host.docker.internal:9333`, writes a stand-in `DevToolsActivePort`, runs
+  `chrome-devtools-mcp --autoConnect`), `check.sh` (tests each hop), `start-agent-brave.bat`
+  (starts the agent Brave on Windows) and a `README.md` covering why each piece exists, security
+  and troubleshooting.
+- A `chrome-devtools` MCP server entry — in the committed `.mcp.json` (**project** scope, the
+  default), or in Claude's local config with the kit git-ignored via `.git/info/exclude`
+  (**local** scope). With more than one committer in the repo, the skill asks which: committing
+  it proposes a path from every teammate's agent into a logged-in browser.
+- `*.bat text eol=crlf` in `.gitattributes` (project scope), since cmd.exe misparses LF-only
+  batch files.
+
+**How it runs**
+
+1. *Pick the repo and scope* — stops if Claude isn't in a container (plain `--autoConnect` works
+   there).
+2. *Install* — `scripts/install.sh` copies the kit and registers the server. Safe to re-run;
+   files that differ from the kit are kept unless you agree to `--force`. Flags missing or old
+   Node, an unresolvable `host.docker.internal` and an egress firewall that needs a rule.
+3. *Check the path* — runs `check.sh`, which triggers the browser's Allow dialog; if the browser
+   isn't reachable, says what to do on Windows.
+4. *Hand over* — restart Claude from the repo root, approve the server, confirm with `/mcp`.
+
+The Windows side is once per machine and shared by every container on it.
 
 ## Adding a skill to this plugin
 
